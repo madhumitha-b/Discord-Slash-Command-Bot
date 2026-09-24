@@ -2,6 +2,7 @@ package com.example.project;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +21,11 @@ public class DiscordInteractionController {
         this.objectMapper = objectMapper;
     }
 
-    @PostMapping("/interactions")
+    @PostMapping(
+            value = "/interactions",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
     public ResponseEntity<String> handleInteraction(
             @RequestHeader("X-Signature-Ed25519") String signature,
             @RequestHeader("X-Signature-Timestamp") String timestamp,
@@ -35,29 +40,68 @@ public class DiscordInteractionController {
 
         if (!valid) {
             return ResponseEntity.badRequest()
-                    .body("Invalid signature");
+                    .body("{\"error\":\"Invalid signature\"}");
         }
 
         try {
-            // 2. Convert JSON body into a JsonNode
+
+            // 2. Convert JSON request into JsonNode
             JsonNode interaction = objectMapper.readTree(body);
 
-            // 3. Get interaction type
             int type = interaction.get("type").asInt();
 
-            // 4. Handle Discord PING
+            // 3. Discord PING
             if (type == 1) {
                 return ResponseEntity.ok(
                         "{\"type\":1}"
                 );
             }
 
-            // Other interaction types will be handled later
-            return ResponseEntity.ok("received");
+            // 4. Discord slash command
+            if (type == 2) {
+
+                String commandName =
+                        interaction
+                                .get("data")
+                                .get("name")
+                                .asText();
+
+                if (commandName.equals("status")) {
+
+                    return ResponseEntity.ok(
+                            "{\"type\":4,\"data\":{\"content\":\"Bot is running! ✅\"}}"
+                    );
+                }
+
+                if (commandName.equals("report")) {
+
+                    String reportText =
+                            interaction
+                                    .get("data")
+                                    .get("options")
+                                    .get(0)
+                                    .get("value")
+                                    .asText();
+
+                    return ResponseEntity.ok(
+                            "{\"type\":4,\"data\":{\"content\":\"Report received: "
+                                    + reportText
+                                    + "\"}}"
+                    );
+                }
+
+                return ResponseEntity.ok(
+                        "{\"type\":4,\"data\":{\"content\":\"Unknown command\"}}"
+                );
+            }
+
+            return ResponseEntity.badRequest()
+                    .body("{\"error\":\"Unsupported interaction type\"}");
 
         } catch (Exception e) {
+
             return ResponseEntity.badRequest()
-                    .body("Invalid JSON");
+                    .body("{\"error\":\"Invalid JSON\"}");
         }
     }
 }
