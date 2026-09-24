@@ -15,8 +15,13 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/discord/interactions").permitAll()
+                .requestMatchers("/h2-console/**").permitAll()
                 .anyRequest().authenticated()
             );
+
+        http.headers(headers ->
+        headers.frameOptions(frame -> frame.disable())
+);
 
         return http.build();
     }
