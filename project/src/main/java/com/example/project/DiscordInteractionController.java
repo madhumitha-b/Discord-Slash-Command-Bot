@@ -51,6 +51,8 @@ public class DiscordInteractionController {
             // 2. Convert JSON request into JsonNode
             JsonNode interaction = objectMapper.readTree(body);
 
+            System.out.println("INTERACTION: " + body);
+
             int type = interaction.get("type").asInt();
 
             // 3. Discord PING
