@@ -552,28 +552,6 @@ DISCORD_MIRROR_WEBHOOK_URL=
 
 Never place real values in this file.
 
-## Submission Testing Instructions
-
-For an evaluator using the deployed application:
-
-1. Open the deployed dashboard URL.
-2. Sign in using the provided throwaway admin credentials.
-3. Confirm command logs are visible.
-4. Confirm command configuration is visible.
-5. Run `/status` in the test Discord server.
-6. Run `/report test message`.
-7. Confirm the Discord response.
-8. Confirm the new command appears in the dashboard.
-9. Confirm the Slack notification when mirroring is enabled.
-10. Disable mirroring and verify that the Discord response still works without a Slack message.
-
-For the final submission, provide:
-
-* GitHub repository URL
-* Deployed Render URL
-* Discord test-server instructions or bot invite instructions
-* Throwaway dashboard credentials
-
 ## Future Improvements
 
 Possible future improvements include:
