@@ -2,6 +2,7 @@ package com.example.project;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -25,12 +26,13 @@ public class DiscordMirrorService {
         this.httpClient = HttpClient.newHttpClient();
     }
 
+    @Async
     public void sendToMirrorChannel(String message) {
 
         try {
             String json = objectMapper
                     .createObjectNode()
-                    .put("content", message)
+                    .put("text", message)
                     .toString();
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -44,10 +46,18 @@ public class DiscordMirrorService {
                     HttpResponse.BodyHandlers.ofString()
             );
 
-            System.out.println("WEBHOOK STATUS: " + response.statusCode());
+            System.out.println(
+                    "SLACK WEBHOOK STATUS: " + response.statusCode()
+            );
+
+            System.out.println(
+                    "SLACK WEBHOOK RESPONSE: " + response.body()
+            );
 
         } catch (Exception e) {
-            System.out.println("WEBHOOK FAILED: " + e.getMessage());
+            System.out.println(
+                    "SLACK WEBHOOK FAILED: " + e.getMessage()
+            );
         }
     }
 }
