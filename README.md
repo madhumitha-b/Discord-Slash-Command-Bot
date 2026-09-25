@@ -390,7 +390,7 @@ Install:
 ## Clone the repository
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
+git clone https://github.com/madhumitha-b/Discord-Slash-Command-Bot.git
 cd Discord-Slash-Command-Bot/project
 ```
 
