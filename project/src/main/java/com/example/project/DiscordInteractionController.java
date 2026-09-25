@@ -134,9 +134,9 @@ public class DiscordInteractionController {
                 if (commandName.equals("report")) {
 
                     // Send report to Server 2
-                   /* discordMirrorService.sendToMirrorChannel(
+                    discordMirrorService.sendToMirrorChannel(
                             "Report received: " + reportText
-                    );*/
+                    );
 
                     return ResponseEntity.ok(
                             "{\"type\":4,\"data\":{\"content\":\"Report received: "
