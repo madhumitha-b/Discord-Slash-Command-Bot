@@ -138,24 +138,31 @@ public class DiscordInteractionController {
                 // 10. STATUS
                 if (commandName.equals("status")) {
 
-                    log.setActionTaken(
-                            "Command saved to DB; Discord response sent"
-                    );
+                log.setActionTaken(
+                        config.isMirrorEnabled()
+                                ? "Command saved to DB; Discord response sent; Slack mirror triggered"
+                                : "Command saved to DB; Discord response sent; Slack mirror disabled"
+                );
 
-                    CommandLog savedLog =
-                            commandLogRepository.save(log);
+                CommandLog savedLog = commandLogRepository.save(log);
 
-                    System.out.println(
-                            "LOG SAVED: id=" + savedLog.getId()
-                                    + ", command=" + savedLog.getCommandName()
-                                    + ", user=" + savedLog.getUserId()
-                    );
+                System.out.println(
+                        "LOG SAVED: id=" + savedLog.getId()
+                                + ", command=" + savedLog.getCommandName()
+                                + ", user=" + savedLog.getUserId()
+                );
 
-                    return ResponseEntity.ok(
-                            "{\"type\":4,\"data\":{\"content\":\""
-                                    + config.getResponseMessage()
-                                    + "\"}}"
-                    );
+                if (config.isMirrorEnabled()) {
+                        discordMirrorService.sendToMirrorChannel(
+                                config.getResponseMessage()
+                        );
+                }
+
+                return ResponseEntity.ok(
+                        "{\"type\":4,\"data\":{\"content\":\""
+                                + config.getResponseMessage()
+                                + "\"}}"
+                );
                 }
 
                 // 11. REPORT
