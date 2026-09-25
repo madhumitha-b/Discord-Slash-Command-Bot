@@ -1,6 +1,6 @@
 # Discord Slash-Command Bot
 
-A Spring Boot web application that receives Discord slash-command interactions through a public HTTP endpoint, verifies Discord signatures, records commands in PostgreSQL, responds to users in Discord, mirrors notifications to Slack, and provides a login-protected admin dashboard for monitoring and command configuration.
+A Spring Boot web application that receives Discord slash-command interactions through a public HTTP endpoint, verifies Discord requests, records commands in PostgreSQL, responds to users in Discord, mirrors notifications to Slack, and provides a login-protected admin dashboard for monitoring and configuring command behavior.
 
 ## Features
 
@@ -8,59 +8,74 @@ A Spring Boot web application that receives Discord slash-command interactions t
 
   * `/status`
   * `/report <text>`
-* Discord HTTP Interactions Endpoint
+* Public Discord HTTP Interactions Endpoint
 * Ed25519 signature verification
 * Discord PING/PONG handling
 * Duplicate interaction protection using Discord interaction IDs
-* Request timestamp validation to reject stale requests
-* Command logging in PostgreSQL
-* Discord responses within the interaction response window
-* Asynchronous Slack notifications using an Incoming Webhook
-* Slack retry handling for temporary failures
+* Request timestamp validation
+* PostgreSQL persistence using Neon
 * Login-protected admin dashboard
-* Live command log with automatic refresh
-* Action tracking for Discord and Slack operations
+* Live command log
+* Action tracking
 * Database-backed command configuration
 * Enable/disable commands from the dashboard
+* Configurable command response messages
 * Enable/disable Slack mirroring from the dashboard
-* Configurable Discord response messages
-* Deployment on Render
-* PostgreSQL database hosted on Neon
+* Asynchronous Slack Incoming Webhook notifications
+* Slack retry handling for temporary failures
+* Deployment using Render
+
+---
 
 ## Architecture
 
 ```text
-Discord User
-     |
-     | /status or /report
-     v
-Discord HTTP Interaction
-     |
-     v
-Render / Spring Boot
-     |
-     +----------------------+
-     |                      |
-     v                      v
-Signature Verification   Command Configuration
-     |                      |
-     +----------+-----------+
-                |
-                v
-         Save Command Log
-         to Neon PostgreSQL
-                |
-        +-------+--------+
-        |                |
-        v                v
- Discord response    Async Slack mirror
-        |                |
-        v                v
-   Discord Server     Slack Channel
-                |
-                v
-        Admin Dashboard
+                         Discord Server 1
+                                |
+                         /status /report
+                                |
+                                v
+                    Discord HTTP Interaction
+                                |
+                                v
+                         Render / Spring Boot
+                                |
+                    +-----------+-----------+
+                    |                       |
+                    v                       v
+             Signature Check        Command Configuration
+                    |                 from PostgreSQL
+                    +-----------+-----------+
+                                |
+                                v
+                         Process Command
+                                |
+                    +-----------+-----------+
+                    |                       |
+                    v                       v
+             Neon PostgreSQL        Discord Response
+                    |                       |
+                    |                       v
+                    |                 Discord User
+                    |
+                    +-----------------------+
+                                            |
+                                            v
+                                  Async Slack Webhook
+                                            |
+                                            v
+                                       Slack Channel
+                                           
+                               
+                         Admin Dashboard
+                                |
+                                v
+                         Command Logs
+                         + Actions
+                         + Configuration
 ```
+
+---
 
 ## Technology Stack
 
@@ -68,70 +83,86 @@ Signature Verification   Command Configuration
 * Spring Boot
 * Spring MVC
 * Spring Security
-* Spring Data JPA / Hibernate
+* Spring Data JPA
+* Hibernate
 * PostgreSQL
 * Neon PostgreSQL
 * Maven
 * Discord Interactions API
 * Slack Incoming Webhooks
-* HTML/CSS/JavaScript
+* HTML / CSS / JavaScript
 * Render
+
+---
 
 ## Project Structure
 
-The main application code is under:
-
 ```text
-src/
-└── main/
-    ├── java/com/example/project/
-    │   ├── ProjectApplication.java
-    │   ├── DiscordInteractionController.java
-    │   ├── DiscordSignatureVerifier.java
-    │   ├── CommandLog.java
-    │   ├── CommandLogRepository.java
-    │   ├── CommandConfig.java
-    │   ├── CommandConfigRepository.java
-    │   ├── DiscordMirrorService.java
-    │   ├── AdminDashboardController.java
-    │   └── SecurityConfig.java
-    │
-    └── resources/
-        ├── application.properties
-        └── static/
-            └── dashboard.html
+project/
+├── pom.xml
+├── README.md
+├── AI_NOTES.md
+├── .env.example
+│
+└── src/
+    └── main/
+        ├── java/com/example/project/
+        │   ├── ProjectApplication.java
+        │   ├── DiscordInteractionController.java
+        │   ├── DiscordSignatureVerifier.java
+        │   ├── CommandLog.java
+        │   ├── CommandLogRepository.java
+        │   ├── CommandConfig.java
+        │   ├── CommandConfigRepository.java
+        │   ├── DiscordMirrorService.java
+        │   ├── AdminDashboardController.java
+        │   └── SecurityConfig.java
+        │
+        └── resources/
+            ├── application.properties
+            └── static/
+                └── dashboard.html
 ```
 
-## How the Discord Interaction Flow Works
+---
 
-When a user executes a slash command in Discord, Discord sends a signed HTTP POST request to:
+# Discord Interaction Flow
+
+When a user runs a slash command, Discord sends a signed HTTP POST request to:
 
 ```text
 POST /api/discord/interactions
 ```
 
-The application:
+The application performs the following steps:
 
-1. Validates the Discord request signature.
+1. Verifies the Discord Ed25519 signature.
 2. Validates the request timestamp.
 3. Handles Discord PING requests.
 4. Identifies the slash command.
-5. Reads the command configuration from PostgreSQL.
-6. Rejects disabled or unconfigured commands.
-7. Checks the interaction ID to prevent duplicate processing.
-8. Records the command in PostgreSQL.
-9. Responds to the Discord user.
-10. Starts the Slack mirror asynchronously when configured.
+5. Loads the command configuration from PostgreSQL.
+6. Rejects commands that are not configured or are disabled.
+7. Checks the Discord interaction ID to prevent duplicate processing.
+8. Extracts command information and report text when applicable.
+9. Stores the command and action information in PostgreSQL.
+10. Responds to the user in Discord.
+11. Starts the Slack mirror asynchronously when enabled.
 
-The Slack operation is asynchronous so a downstream notification does not unnecessarily delay the Discord interaction response.
+---
 
-## Commands
+# Slash Commands
 
-### `/status`
+## `/status`
 
-Returns the configured status response.
+Checks the bot status.
 
 Example:
+
+```text
+/status
+```
+
+Example response:
 
 ```text
 Bot is running! ✅
@@ -139,13 +170,15 @@ Bot is running! ✅
 
 The dashboard can control:
 
-* Whether `/status` is enabled
-* Its response message
-* Whether it is mirrored to Slack
+* Whether the command is enabled
+* The response message
+* Whether the response is mirrored to Slack
 
-### `/report <text>`
+---
 
-Records the supplied report text and returns a configurable response.
+## `/report <text>`
+
+Records a report entered by the Discord user.
 
 Example:
 
@@ -153,25 +186,25 @@ Example:
 /report database is unavailable
 ```
 
-Response:
+Example Discord response:
 
 ```text
 Report received: database is unavailable
 ```
 
-When mirroring is enabled, the same notification is sent to the configured Slack channel.
+When Slack mirroring is enabled, the notification is also sent to the configured Slack channel.
 
-## Database
+---
 
-The application uses PostgreSQL hosted on Neon.
+# Database
 
-Two main tables are used.
+The deployed application uses PostgreSQL hosted on Neon.
 
-### `command_logs`
+## `command_logs`
 
-Stores received Discord commands and their actions.
+Stores received Discord interactions and the resulting actions.
 
-Typical fields include:
+Typical fields:
 
 ```text
 id
@@ -184,11 +217,27 @@ action_taken
 created_at
 ```
 
-### `command_configs`
+Example action:
 
-Stores command behavior.
+```text
+Command saved to DB; Discord response sent; Slack mirror sent
+```
 
-Typical fields include:
+or, when Slack is disabled:
+
+```text
+Command saved to DB; Discord response sent; Slack mirror disabled
+```
+
+If the Slack operation fails, the action is updated to indicate the failure.
+
+---
+
+## `command_configs`
+
+Stores the behavior of each supported command.
+
+Typical fields:
 
 ```text
 id
@@ -198,25 +247,46 @@ response_message
 mirror_enabled
 ```
 
+Example:
+
+```text
+/status
+enabled = true
+response_message = Bot is running! ✅
+mirror_enabled = true
+```
+
+The application uses the configuration stored in PostgreSQL rather than relying only on hard-coded command behavior.
+
 Hibernate updates the schema automatically using:
 
 ```properties
 spring.jpa.hibernate.ddl-auto=update
 ```
 
-## Admin Dashboard
+---
+
+# Admin Dashboard
 
 The dashboard is protected by Spring Security login.
 
-After authentication, the admin can view:
+Dashboard URL:
 
-### Command activity
+```text
+https://discord-slash-command-bot-hxfk.onrender.com/dashboard.html
+```
+
+## Dashboard sections
+
+### Command Summary
+
+Shows:
 
 * Total commands
-* Report count
-* Status count
+* Number of `/report` commands
+* Number of `/status` commands
 
-### Command configuration
+### Command Configuration
 
 For each command, the admin can configure:
 
@@ -224,25 +294,41 @@ For each command, the admin can configure:
 * Response message
 * Slack mirroring enabled / disabled
 
-### Command logs
+Example:
 
-The dashboard displays:
+```text
+/report
 
-* Command ID
-* Command name
+Enabled: ✅
+
+Response Message:
+Report received
+
+Mirror to Slack:
+✅
+```
+
+Clicking **Save** updates the configuration in PostgreSQL.
+
+### Command Logs
+
+The dashboard shows:
+
+* ID
+* Command
 * Discord user ID
 * Discord channel ID
 * Report text
-* Action taken
+* Action Taken
 * Timestamp
 
 The command log automatically refreshes every 10 seconds.
 
-## Environment Variables
+---
 
-Secrets are not committed to the repository.
+# Environment Variables
 
-Create your local environment variables before running the application.
+Secrets are stored outside the source code using environment variables.
 
 Required variables:
 
@@ -250,35 +336,50 @@ Required variables:
 DISCORD_PUBLIC_KEY=
 ADMIN_USERNAME=
 ADMIN_PASSWORD=
+
 DATABASE_URL=
 DB_USERNAME=
 DB_PASSWORD=
+
 DISCORD_MIRROR_WEBHOOK_URL=
 ```
 
-### Variable descriptions
+## Variable descriptions
 
-| Variable                     | Purpose                                                                |
-| ---------------------------- | ---------------------------------------------------------------------- |
-| `DISCORD_PUBLIC_KEY`         | Discord application's public key used for Ed25519 request verification |
-| `ADMIN_USERNAME`             | Admin dashboard username                                               |
-| `ADMIN_PASSWORD`             | Admin dashboard password                                               |
-| `DATABASE_URL`               | Neon PostgreSQL JDBC connection URL                                    |
-| `DB_USERNAME`                | Neon PostgreSQL username/role                                          |
-| `DB_PASSWORD`                | Neon PostgreSQL password                                               |
-| `DISCORD_MIRROR_WEBHOOK_URL` | Slack Incoming Webhook URL                                             |
+| Variable                     | Purpose                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `DISCORD_PUBLIC_KEY`         | Discord application's public key used for request signature verification |
+| `ADMIN_USERNAME`             | Username for the admin dashboard                                         |
+| `ADMIN_PASSWORD`             | Password for the admin dashboard                                         |
+| `DATABASE_URL`               | Neon PostgreSQL JDBC connection URL                                      |
+| `DB_USERNAME`                | Neon PostgreSQL database user/role                                       |
+| `DB_PASSWORD`                | Neon PostgreSQL password                                                 |
+| `DISCORD_MIRROR_WEBHOOK_URL` | Slack Incoming Webhook URL                                               |
 
-Example PostgreSQL JDBC URL:
+Example JDBC URL:
 
 ```text
 jdbc:postgresql://<host>/<database>?sslmode=require
 ```
 
-Do not commit real credentials, tokens, database passwords, or webhook URLs.
+### Secret handling
 
-## Local Setup
+The following values must never be committed to GitHub:
 
-### Prerequisites
+* Discord bot token
+* Discord application credentials
+* Discord public key if treated as deployment secret
+* Neon database password
+* Slack webhook URL
+* Admin password
+
+Use `.env.example` only as a template.
+
+---
+
+# Local Setup
+
+## Prerequisites
 
 Install:
 
@@ -286,281 +387,596 @@ Install:
 * Maven
 * Git
 
-### Clone the repository
+## Clone the repository
 
 ```bash
 git clone <YOUR_GITHUB_REPOSITORY_URL>
 cd Discord-Slash-Command-Bot/project
 ```
 
-### Configure environment variables
+## Configure environment variables
 
-For a Linux/macOS/Codespaces terminal:
+Create your local environment variables.
+
+Linux/macOS/Codespaces example:
 
 ```bash
-export DISCORD_PUBLIC_KEY="your-public-key"
+export DISCORD_PUBLIC_KEY="your-discord-public-key"
+
 export ADMIN_USERNAME="admin"
-export ADMIN_PASSWORD="your-password"
+export ADMIN_PASSWORD="your-local-password"
+
 export DATABASE_URL="jdbc:postgresql://your-host/your-database?sslmode=require"
 export DB_USERNAME="your-database-user"
 export DB_PASSWORD="your-database-password"
+
 export DISCORD_MIRROR_WEBHOOK_URL="your-slack-webhook-url"
 ```
 
-For local Windows development, configure the same variables in the operating system environment or through your IDE.
+Do not commit these values to GitHub.
 
-### Build
+## Build the application
 
 ```bash
 mvn clean package -DskipTests
 ```
 
-### Run
+## Run the application
 
 ```bash
 mvn spring-boot:run
 ```
 
-The application runs on:
+The application is available locally at:
 
 ```text
 http://localhost:8080
 ```
 
-The dashboard is available at:
+Dashboard:
 
 ```text
 http://localhost:8080/dashboard.html
 ```
 
-The Discord interactions endpoint is:
+Discord interactions endpoint:
 
 ```text
 http://localhost:8080/api/discord/interactions
 ```
 
-Discord cannot call a localhost endpoint, so a public deployment is required for actual Discord interaction testing.
+Discord cannot send interactions to localhost, so a public deployment is required for real Discord testing.
 
-## Discord Configuration
+---
 
-Create an application in the Discord Developer Portal.
+# Discord Configuration
+
+Create a Discord application in the Discord Developer Portal.
 
 Configure:
 
-1. Application public key
-2. Bot
-3. Slash commands
-4. Interactions Endpoint URL
+* Discord application
+* Slash commands
+* Interaction Endpoint URL
 
-The production endpoint is:
+Production interaction endpoint:
 
 ```text
 https://discord-slash-command-bot-hxfk.onrender.com/api/discord/interactions
 ```
 
-The Discord application must be configured to send interactions to the deployed endpoint.
-
-At least these commands are registered:
+The registered slash commands are:
 
 ```text
 /status
 /report <text>
 ```
 
-The bot must be added to the Discord test server with the required permissions.
-
-## Slack Configuration
-
-The application uses a Slack Incoming Webhook for the second-channel notification requirement.
-
-Create a Slack app, enable Incoming Webhooks, install the app into the workspace, and create a webhook for the target channel.
-
-Store the webhook URL only as:
+The application handles Discord interaction types required by the implementation, including:
 
 ```text
-DISCORD_MIRROR_WEBHOOK_URL
+PING
+APPLICATION_COMMAND
 ```
 
-The URL must never be exposed in frontend code or committed to GitHub.
+---
 
-## Deployment
+# Discord Bot Installation
 
-The application is deployed as a web service on Render.
+Use the Discord application installation/invite URL to add the bot to a test server.
 
-Production deployment flow:
+Installation URL:
 
 ```text
-GitHub repository
-        |
-        v
-Render
-        |
-        v
-Spring Boot application
-        |
-        +----> Neon PostgreSQL
-        |
-        +----> Slack Incoming Webhook
-        |
-        +----> Discord Interactions Endpoint
+https://discord.com/oauth2/authorize?client_id=1552451013011837028&scope=bot%20applications.commands&permissions=2048
 ```
 
-### Render configuration
+The evaluator must have permission to add applications/bots to the target Discord server.
 
-Configure the required environment variables in:
-
-```text
-Render → Service → Environment
-```
-
-The application uses Render's provided `PORT` value when available and falls back to port `8080` locally.
-
-The deployed application must remain publicly reachable because Discord sends interaction requests to the production URL.
-
-## Testing
-
-### Test `/status`
-
-In the Discord server:
+After installation, use:
 
 ```text
 /status
 ```
 
-Expected:
+and:
 
 ```text
-Bot is running! ✅
+/report <text>
 ```
 
-When Slack mirroring is enabled for `/status`, the same notification is also sent to the configured Slack channel.
+---
 
-### Test `/report`
+# Slack Configuration
 
-In the Discord server:
+Slack is used for the second-channel notification requirement.
+
+The application uses a Slack Incoming Webhook.
+
+Setup:
+
+1. Create a Slack app.
+2. Enable Incoming Webhooks.
+3. Add the webhook to the desired Slack channel.
+4. Store the webhook URL in the environment variable:
 
 ```text
-/report test message
+DISCORD_MIRROR_WEBHOOK_URL
 ```
 
-Expected:
+The webhook URL is never exposed to the frontend.
+
+---
+
+# Asynchronous Slack Mirroring
+
+Slack mirroring is performed asynchronously.
+
+The flow is:
 
 ```text
-Report received: test message
+Discord /report
+      |
+      v
+Save command to PostgreSQL
+      |
+      +-------> Start Slack notification in background
+      |
+      v
+Immediately respond to Discord
 ```
 
-The command should also:
+This prevents a slow Slack request from unnecessarily delaying the Discord interaction response.
 
-* Create a row in `command_logs`
-* Appear on the dashboard
-* Record the action taken
-* Send the notification to Slack when mirroring is enabled
+---
 
-### Test command configuration
+# Slack Retry Handling
 
-From the dashboard:
+Temporary Slack failures are retried.
 
-1. Disable a command.
-2. Save the configuration.
-3. Execute the command in Discord.
+The application retries:
 
-The command should report that it is disabled.
+* HTTP 429 rate-limit responses
+* HTTP 5xx server errors
+* Temporary request exceptions
 
-Re-enable the command and test again.
+A maximum of three attempts is used.
 
-### Test Slack mirroring
+Non-retryable errors such as an invalid webhook configuration are recorded as failures without repeatedly retrying.
 
-Enable:
+The resulting action is stored in the command log.
+
+Examples:
+
+Successful:
 
 ```text
-Mirror to Slack = ON
+Command saved to DB; Discord response sent; Slack mirror sent
 ```
 
-Run `/report`.
-
-Expected:
+Failed:
 
 ```text
-Discord → response
-PostgreSQL → command log
-Slack → mirrored notification
-Dashboard → action status
+Command saved to DB; Discord response sent; Slack mirror failed (HTTP 404)
 ```
 
-Disable Slack mirroring and repeat the command.
+---
 
-The Discord response should still work, but no Slack notification should be sent.
+# Security and Reliability
 
-## Reliability and Security
+## Ed25519 Signature Verification
 
-The application includes several protections required by the exercise.
-
-### Discord signature verification
-
-Every interaction request is verified using the Discord Ed25519 signature headers:
+Every Discord interaction is verified using:
 
 ```text
 X-Signature-Ed25519
 X-Signature-Timestamp
 ```
 
-### Timestamp validation
+Unsigned or invalid requests are rejected.
 
-Requests older than the configured freshness window are rejected.
+---
 
-### Duplicate protection
+## Request Timestamp Validation
 
-The Discord interaction ID is stored in PostgreSQL and checked before processing.
+The request timestamp is checked against the current server time.
 
-This prevents the same interaction from being processed more than once.
+Requests outside the configured five-minute freshness window are rejected.
 
-### Asynchronous Slack notification
+This reduces the risk of replaying an old signed interaction.
 
-Slack mirroring is executed asynchronously so the Discord interaction response does not wait for the downstream notification.
+---
 
-### Slack retry handling
+## Duplicate Interaction Protection
 
-Temporary Slack failures can be retried.
+The Discord interaction ID is stored in PostgreSQL.
 
-Failures are recorded in the command log so they are visible in the dashboard.
-
-### Secret management
-
-Sensitive values are supplied through environment variables instead of source code.
-
-Do not expose:
-
-* Discord bot tokens
-* Discord public/private credentials
-* Database passwords
-* Slack webhook URLs
-* Admin passwords
-
-## Example Environment File
-
-Create a local `.env.example` containing variable names only:
+Before processing a command, the application checks:
 
 ```text
-DISCORD_PUBLIC_KEY=
-ADMIN_USERNAME=
-ADMIN_PASSWORD=
-DATABASE_URL=
-DB_USERNAME=
-DB_PASSWORD=
-DISCORD_MIRROR_WEBHOOK_URL=
+Has this interaction ID already been processed?
 ```
 
-Never place real values in this file.
+If it has, duplicate processing is prevented.
 
-## Future Improvements
+---
+
+## Downstream Failure Visibility
+
+Slack failures are not silently ignored.
+
+The command log is updated with the result of the mirror operation so the dashboard can show whether the notification was successfully sent or failed.
+
+---
+
+## Secret Management
+
+Secrets are provided through environment variables.
+
+Credentials are not embedded in:
+
+* Java source code
+* HTML
+* JavaScript
+* GitHub repository files
+* Dashboard responses
+* application logs
+
+---
+
+# Testing
+
+## Test `/status`
+
+Run in Discord:
+
+```text
+/status
+```
+
+Expected Discord response:
+
+```text
+Bot is running! ✅
+```
+
+If Slack mirroring is enabled, Slack should also receive the notification.
+
+The dashboard should show a new log entry.
+
+---
+
+## Test `/report`
+
+Run:
+
+```text
+/report test message
+```
+
+Expected Discord response:
+
+```text
+Report received: test message
+```
+
+Expected behavior:
+
+```text
+Discord response  → ✅
+PostgreSQL record → ✅
+Dashboard log     → ✅
+Slack mirror      → ✅ when enabled
+```
+
+---
+
+## Test Command Configuration
+
+Open the dashboard.
+
+For example, change:
+
+```text
+/report
+```
+
+Response Message:
+
+```text
+New report received
+```
+
+Click **Save**.
+
+Run:
+
+```text
+/report test
+```
+
+The Discord response should use the updated configuration.
+
+---
+
+## Test Disabled Command
+
+In the dashboard:
+
+```text
+/report
+Enabled → OFF
+```
+
+Save the configuration.
+
+Run:
+
+```text
+/report test
+```
+
+Expected:
+
+```text
+This command is currently disabled
+```
+
+---
+
+## Test Slack Mirroring
+
+Enable:
+
+```text
+Mirror to Slack → ON
+```
+
+Run:
+
+```text
+/report test
+```
+
+Expected:
+
+```text
+Discord → response
+PostgreSQL → command recorded
+Slack → notification received
+Dashboard → action recorded
+```
+
+Disable mirroring and run the command again.
+
+Expected:
+
+```text
+Discord → response
+PostgreSQL → command recorded
+Slack → no notification
+```
+
+The dashboard should record that Slack mirroring was disabled.
+
+---
+
+# Deployment
+
+The application is deployed on Render.
+
+The production architecture is:
+
+```text
+GitHub
+   |
+   v
+Render
+   |
+   +---- Spring Boot application
+   |
+   +---- Neon PostgreSQL
+   |
+   +---- Slack Incoming Webhook
+   |
+   +---- Discord Interactions Endpoint
+```
+
+Render provides the application's runtime `PORT`.
+
+The application uses:
+
+```text
+PORT
+```
+
+when provided by the hosting environment and uses the local development port when running locally.
+
+---
+
+# Production URL
+
+```text
+https://discord-slash-command-bot-hxfk.onrender.com
+```
+
+Dashboard:
+
+```text
+https://discord-slash-command-bot-hxfk.onrender.com/dashboard.html
+```
+
+Discord interaction endpoint:
+
+```text
+https://discord-slash-command-bot-hxfk.onrender.com/api/discord/interactions
+```
+
+---
+
+# Evaluator Instructions
+
+## 1. Open the dashboard
+
+Open:
+
+```text
+https://discord-slash-command-bot-hxfk.onrender.com/dashboard.html
+```
+
+The dashboard requires login.
+
+## 2. Admin credentials
+
+A throwaway administrator account is configured for evaluation.
+
+Credentials should be provided separately from the repository.
+
+No personal credentials should be used by the evaluator.
+
+## 3. Install the Discord bot
+
+Use:
+
+```text
+https://discord.com/oauth2/authorize?client_id=1552451013011837028&scope=bot%20applications.commands&permissions=2048
+```
+
+to add the bot to a test server.
+
+The evaluator must have sufficient permissions to install the application.
+
+## 4. Test `/status`
+
+Run:
+
+```text
+/status
+```
+
+Verify:
+
+* Discord response
+* Dashboard log
+* Slack notification when enabled
+
+## 5. Test `/report`
+
+Run:
+
+```text
+/report test message
+```
+
+Verify:
+
+* Discord response
+* PostgreSQL record
+* Dashboard log
+* Action Taken
+* Slack notification when enabled
+
+## 6. Test configuration
+
+Change the command response message from the dashboard and save it.
+
+Run the command again in Discord.
+
+Verify that the new configuration is used.
+
+## 7. Test disabling mirroring
+
+Turn:
+
+```text
+Mirror to Slack → OFF
+```
+
+Run `/report`.
+
+Verify:
+
+* Discord still responds
+* Command is recorded
+* Slack does not receive the message
+
+## 8. Test disabling a command
+
+Turn:
+
+```text
+Enabled → OFF
+```
+
+Save and execute the command.
+
+Verify that the command reports that it is disabled.
+
+---
+
+# Submission Files
+
+The repository includes:
+
+```text
+README.md
+.env.example
+AI_NOTES.md
+```
+
+`.env.example` contains variable names/placeholders only and does not contain real credentials.
+
+`AI_NOTES.md` documents the AI tools used during development, implementation decisions, debugging experience, and possible future improvements.
+
+---
+
+# Known Design Choices
+
+The application uses Discord HTTP Interactions instead of requiring an always-running Discord websocket listener for incoming commands.
+
+Slack Incoming Webhooks are used for the second-channel notification because the assignment explicitly permits a Slack webhook as the mirror destination.
+
+The deployed application uses Neon PostgreSQL instead of an in-memory database so command logs and configuration persist across application restarts.
+
+---
+
+# Future Improvements
 
 Possible future improvements include:
 
-* Interactive Discord buttons and components
+* Interactive Discord buttons/components
 * Modal-based `/report`
 * AI-based report classification or summarization
-* Multi-server configuration
-* More detailed observability
-* Persistent retry queues for downstream notifications
-* PostgreSQL migrations using Flyway or Liquibase
-* Role-based dashboard access
+* Multi-server support
+* Persistent notification queues
+* More detailed retry history
+* Structured application logging
+* Automated integration tests
+* Database migrations using Flyway or Liquibase
+* More advanced dashboard filtering and analytics
+
+---
+
+# License
+
+This project was created as part of a software engineering assessment.
