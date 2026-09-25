@@ -26,30 +26,33 @@ public class DiscordMirrorService {
         this.mirrorChannelId = mirrorChannelId;
     }
 
-    public void sendToMirrorChannel(String message) {
+public void sendToMirrorChannel(String message) {
 
-        try {
-            String json = objectMapper
-                    .createObjectNode()
-                    .put("content", message)
-                    .toString();
+    try {
+        String json = objectMapper
+                .createObjectNode()
+                .put("content", message)
+                .toString();
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(
-                            "https://discord.com/api/v10/channels/"
-                                    + mirrorChannelId
-                                    + "/messages"
-                    ))
-                    .header("Authorization", "Bot " + botToken)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(json))
-                    .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(
+                        "https://discord.com/api/v10/channels/"
+                                + mirrorChannelId
+                                + "/messages"
+                ))
+                .header("Authorization", "Bot " + botToken)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
 
-            HttpClient.newHttpClient()
-                    .sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofString());
 
-        } catch (Exception e) {
-            System.out.println("Mirror failed: " + e.getMessage());
-        }
+        System.out.println("MIRROR STATUS: " + response.statusCode());
+        System.out.println("MIRROR RESPONSE: " + response.body());
+
+    } catch (Exception e) {
+        System.out.println("MIRROR FAILED: " + e.getMessage());
     }
+}
 }
