@@ -197,7 +197,8 @@ public class DiscordInteractionController {
                     if (config.isMirrorEnabled()) {
 
                         discordMirrorService.sendToMirrorChannel(
-                                config.getResponseMessage()
+                                config.getResponseMessage(),
+                                savedLog.getId()
                         );
                     }
 
@@ -230,9 +231,10 @@ public class DiscordInteractionController {
                     if (config.isMirrorEnabled()) {
 
                         discordMirrorService.sendToMirrorChannel(
-                                config.getResponseMessage()
-                                        + ": "
-                                        + reportText
+                        config.getResponseMessage()
+                        + ": "
+                        + reportText,
+                        savedLog.getId()
                         );
                     }
 
