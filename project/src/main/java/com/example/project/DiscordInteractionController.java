@@ -6,9 +6,13 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+
 @RestController
 @RequestMapping("/api/discord")
 public class DiscordInteractionController {
+
+    private static final long MAX_TIMESTAMP_AGE_SECONDS = 300;
 
     private final DiscordSignatureVerifier signatureVerifier;
     private final ObjectMapper objectMapper;
@@ -48,23 +52,42 @@ public class DiscordInteractionController {
         );
 
         if (!valid) {
-            return ResponseEntity.badRequest()
+            return ResponseEntity.status(401)
                     .body("{\"error\":\"Invalid signature\"}");
+        }
+
+        // 2. Check timestamp freshness
+        long requestTimestamp;
+
+        try {
+            requestTimestamp = Long.parseLong(timestamp);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(401)
+                    .body("{\"error\":\"Invalid timestamp\"}");
+        }
+
+        long currentTimestamp = Instant.now().getEpochSecond();
+
+        if (Math.abs(currentTimestamp - requestTimestamp)
+                > MAX_TIMESTAMP_AGE_SECONDS) {
+
+            return ResponseEntity.status(401)
+                    .body("{\"error\":\"Request timestamp expired\"}");
         }
 
         try {
 
-            // 2. Convert JSON request into JsonNode
+            // 3. Convert JSON request into JsonNode
             JsonNode interaction = objectMapper.readTree(body);
 
             int type = interaction.get("type").asInt();
 
-            // 3. Discord PING
+            // 4. Discord PING
             if (type == 1) {
                 return ResponseEntity.ok("{\"type\":1}");
             }
 
-            // 4. Discord slash command
+            // 5. Discord slash command
             if (type == 2) {
 
                 String commandName = interaction
@@ -72,7 +95,7 @@ public class DiscordInteractionController {
                         .get("name")
                         .asText();
 
-                // 5. Get command configuration from PostgreSQL
+                // 6. Get command configuration from PostgreSQL
                 CommandConfig config = commandConfigRepository
                         .findByCommandName(commandName)
                         .orElse(null);
@@ -83,7 +106,7 @@ public class DiscordInteractionController {
                     );
                 }
 
-                // 6. Check whether command is enabled
+                // 7. Check whether command is enabled
                 if (!config.isEnabled()) {
                     return ResponseEntity.ok(
                             "{\"type\":4,\"data\":{\"content\":\"This command is currently disabled\"}}"
@@ -104,68 +127,88 @@ public class DiscordInteractionController {
                         .get("channel_id")
                         .asText();
 
-                // 7. Prevent duplicate processing
+                // 8. Prevent duplicate processing
                 if (commandLogRepository.existsByInteractionId(interactionId)) {
                     return ResponseEntity.ok(
                             "{\"type\":4,\"data\":{\"content\":\"Already processed\"}}"
                     );
                 }
 
-                // 8. Create command log
+                // 9. Create command log
                 CommandLog log = new CommandLog();
 
                 log.setInteractionId(interactionId);
                 log.setCommandName(commandName);
                 log.setUserId(userId);
                 log.setChannelId(channelId);
-                log.setCreatedAt(java.time.Instant.now());
+                log.setCreatedAt(Instant.now());
 
                 String reportText = null;
 
-                // 9. Extract report text
+                // 10. Extract report text
                 if (commandName.equals("report")) {
 
-                    reportText = interaction
+                    JsonNode options = interaction
                             .get("data")
-                            .get("options")
-                            .get(0)
-                            .get("value")
-                            .asText();
+                            .get("options");
 
-                    log.setText(reportText);
+                    if (options != null && options.isArray() && !options.isEmpty()) {
+
+                        reportText = options
+                                .get(0)
+                                .get("value")
+                                .asText();
+
+                        log.setText(reportText);
+
+                    } else {
+
+                        log.setActionTaken(
+                                "Command received but report text was missing"
+                        );
+
+                        commandLogRepository.save(log);
+
+                        return ResponseEntity.ok(
+                                "{\"type\":4,\"data\":{\"content\":\"Report text is required\"}}"
+                        );
+                    }
                 }
 
-                // 10. STATUS
+                // 11. STATUS
                 if (commandName.equals("status")) {
 
-                log.setActionTaken(
-                        config.isMirrorEnabled()
-                                ? "Command saved to DB; Discord response sent; Slack mirror triggered"
-                                : "Command saved to DB; Discord response sent; Slack mirror disabled"
-                );
+                    log.setActionTaken(
+                            config.isMirrorEnabled()
+                                    ? "Command saved to DB; Discord response sent; Slack mirror triggered"
+                                    : "Command saved to DB; Discord response sent; Slack mirror disabled"
+                    );
 
-                CommandLog savedLog = commandLogRepository.save(log);
+                    CommandLog savedLog =
+                            commandLogRepository.save(log);
 
-                System.out.println(
-                        "LOG SAVED: id=" + savedLog.getId()
-                                + ", command=" + savedLog.getCommandName()
-                                + ", user=" + savedLog.getUserId()
-                );
+                    System.out.println(
+                            "LOG SAVED: id=" + savedLog.getId()
+                                    + ", command=" + savedLog.getCommandName()
+                                    + ", user=" + savedLog.getUserId()
+                    );
 
-                if (config.isMirrorEnabled()) {
+                    // Mirror to Slack only if enabled
+                    if (config.isMirrorEnabled()) {
+
                         discordMirrorService.sendToMirrorChannel(
                                 config.getResponseMessage()
                         );
+                    }
+
+                    return ResponseEntity.ok(
+                            "{\"type\":4,\"data\":{\"content\":\""
+                                    + config.getResponseMessage()
+                                    + "\"}}"
+                    );
                 }
 
-                return ResponseEntity.ok(
-                        "{\"type\":4,\"data\":{\"content\":\""
-                                + config.getResponseMessage()
-                                + "\"}}"
-                );
-                }
-
-                // 11. REPORT
+                // 12. REPORT
                 if (commandName.equals("report")) {
 
                     log.setActionTaken(
@@ -183,7 +226,7 @@ public class DiscordInteractionController {
                                     + ", user=" + savedLog.getUserId()
                     );
 
-                    // Start Slack mirror only when enabled
+                    // Mirror to Slack only if enabled
                     if (config.isMirrorEnabled()) {
 
                         discordMirrorService.sendToMirrorChannel(
@@ -202,7 +245,7 @@ public class DiscordInteractionController {
                     );
                 }
 
-                // 12. Unknown command
+                // 13. Unknown command
                 log.setActionTaken(
                         "Command saved to DB; unknown command response sent"
                 );
