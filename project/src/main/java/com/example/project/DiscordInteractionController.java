@@ -13,15 +13,18 @@ public class DiscordInteractionController {
     private final DiscordSignatureVerifier signatureVerifier;
     private final ObjectMapper objectMapper;
     private final CommandLogRepository commandLogRepository;
+    private final DiscordMirrorService discordMirrorService;
 
     public DiscordInteractionController(
-        DiscordSignatureVerifier signatureVerifier,
-        ObjectMapper objectMapper,
-        CommandLogRepository commandLogRepository) {
+            DiscordSignatureVerifier signatureVerifier,
+            ObjectMapper objectMapper,
+            CommandLogRepository commandLogRepository,
+            DiscordMirrorService discordMirrorService) {
 
         this.signatureVerifier = signatureVerifier;
         this.objectMapper = objectMapper;
         this.commandLogRepository = commandLogRepository;
+        this.discordMirrorService = discordMirrorService;
     }
 
     @PostMapping(
@@ -51,62 +54,75 @@ public class DiscordInteractionController {
             // 2. Convert JSON request into JsonNode
             JsonNode interaction = objectMapper.readTree(body);
 
-            System.out.println("INTERACTION: " + body);
-
             int type = interaction.get("type").asInt();
 
             // 3. Discord PING
             if (type == 1) {
-                return ResponseEntity.ok(
-                        "{\"type\":1}"
-                );
+                return ResponseEntity.ok("{\"type\":1}");
             }
 
             // 4. Discord slash command
             if (type == 2) {
 
-                String commandName =
-                        interaction
-                                .get("data")
-                                .get("name")
-                                .asText();
-                String interactionId = interaction.get("id").asText();
-String userId = interaction.get("member").get("user").get("id").asText();
-String channelId = interaction.get("channel_id").asText();
+                String commandName = interaction
+                        .get("data")
+                        .get("name")
+                        .asText();
 
-if (commandLogRepository.existsByInteractionId(interactionId)) {
-    return ResponseEntity.ok(
-            "{\"type\":4,\"data\":{\"content\":\"Already processed\"}}"
-    );
-}
+                String interactionId = interaction
+                        .get("id")
+                        .asText();
 
-CommandLog log = new CommandLog();
-log.setInteractionId(interactionId);
-log.setCommandName(commandName);
-log.setUserId(userId);
-log.setChannelId(channelId);
-log.setCreatedAt(java.time.Instant.now());
+                String userId = interaction
+                        .get("member")
+                        .get("user")
+                        .get("id")
+                        .asText();
 
-if (commandName.equals("report")) {
-    String reportText = interaction
-            .get("data")
-            .get("options")
-            .get(0)
-            .get("value")
-            .asText();
+                String channelId = interaction
+                        .get("channel_id")
+                        .asText();
 
-    log.setText(reportText);
-}
+                // Prevent duplicate processing
+                if (commandLogRepository.existsByInteractionId(interactionId)) {
+                    return ResponseEntity.ok(
+                            "{\"type\":4,\"data\":{\"content\":\"Already processed\"}}"
+                    );
+                }
 
-CommandLog savedLog = commandLogRepository.save(log);
+                CommandLog log = new CommandLog();
 
-System.out.println(
-        "LOG SAVED: id=" + savedLog.getId()
-        + ", command=" + savedLog.getCommandName()
-        + ", user=" + savedLog.getUserId()
-);
+                log.setInteractionId(interactionId);
+                log.setCommandName(commandName);
+                log.setUserId(userId);
+                log.setChannelId(channelId);
+                log.setCreatedAt(java.time.Instant.now());
 
+                String reportText = null;
 
+                // Extract report text only once
+                if (commandName.equals("report")) {
+
+                    reportText = interaction
+                            .get("data")
+                            .get("options")
+                            .get(0)
+                            .get("value")
+                            .asText();
+
+                    log.setText(reportText);
+                }
+
+                // Save command
+                CommandLog savedLog = commandLogRepository.save(log);
+
+                System.out.println(
+                        "LOG SAVED: id=" + savedLog.getId()
+                                + ", command=" + savedLog.getCommandName()
+                                + ", user=" + savedLog.getUserId()
+                );
+
+                // STATUS
                 if (commandName.equals("status")) {
 
                     return ResponseEntity.ok(
@@ -114,15 +130,13 @@ System.out.println(
                     );
                 }
 
+                // REPORT
                 if (commandName.equals("report")) {
 
-                    String reportText =
-                            interaction
-                                    .get("data")
-                                    .get("options")
-                                    .get(0)
-                                    .get("value")
-                                    .asText();
+                    // Send report to Server 2
+                    discordMirrorService.sendToMirrorChannel(
+                            "Report received: " + reportText
+                    );
 
                     return ResponseEntity.ok(
                             "{\"type\":4,\"data\":{\"content\":\"Report received: "
@@ -131,6 +145,7 @@ System.out.println(
                     );
                 }
 
+                // Unknown command
                 return ResponseEntity.ok(
                         "{\"type\":4,\"data\":{\"content\":\"Unknown command\"}}"
                 );
