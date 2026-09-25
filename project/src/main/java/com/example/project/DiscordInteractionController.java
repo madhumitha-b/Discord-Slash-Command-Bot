@@ -13,17 +13,18 @@ public class DiscordInteractionController {
     private final DiscordSignatureVerifier signatureVerifier;
     private final ObjectMapper objectMapper;
     private final CommandLogRepository commandLogRepository;
-    //private final DiscordMirrorService discordMirrorService;
+    private final DiscordMirrorService discordMirrorService;
 
     public DiscordInteractionController(
             DiscordSignatureVerifier signatureVerifier,
             ObjectMapper objectMapper,
-            CommandLogRepository commandLogRepository) {
+            CommandLogRepository commandLogRepository,
+            DiscordMirrorService discordMirrorService) {
 
         this.signatureVerifier = signatureVerifier;
         this.objectMapper = objectMapper;
         this.commandLogRepository = commandLogRepository;
-        //this.discordMirrorService = discordMirrorService;
+        this.discordMirrorService = discordMirrorService;
     }
 
     @PostMapping(
@@ -133,9 +134,9 @@ public class DiscordInteractionController {
                 if (commandName.equals("report")) {
 
                     // Send report to Server 2
-                   /* discordMirrorService.sendToMirrorChannel(
+                    discordMirrorService.sendToMirrorChannel(
                             "Report received: " + reportText
-                    );*/
+                    );
 
                     return ResponseEntity.ok(
                             "{\"type\":4,\"data\":{\"content\":\"Report received: "
