@@ -100,10 +100,11 @@
             font-weight: bold;
         }
 
-        .logs-section {
+        .section {
             background: white;
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            margin-bottom: 28px;
             overflow: hidden;
         }
 
@@ -120,17 +121,79 @@
             font-size: 18px;
         }
 
-        .refresh-button {
+        .section-content {
+            padding: 22px;
+        }
+
+        .refresh-button,
+        .save-button {
             background: #2563eb;
             color: white;
             border: none;
             padding: 9px 16px;
             border-radius: 6px;
             cursor: pointer;
+            font-size: 14px;
         }
 
-        .refresh-button:hover {
+        .refresh-button:hover,
+        .save-button:hover {
             background: #1d4ed8;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+
+        .config-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .config-card h4 {
+            margin: 0 0 18px;
+            font-size: 18px;
+        }
+
+        .config-row {
+            margin-bottom: 16px;
+        }
+
+        .config-label {
+            display: block;
+            font-size: 13px;
+            font-weight: bold;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+
+        .response-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .response-input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .save-status {
+            margin-left: 10px;
+            font-size: 13px;
         }
 
         .table-container {
@@ -153,7 +216,7 @@
         th {
             background: #f9fafb;
             color: #6b7280;
-            font-size: 13px;
+            font-size: 12px;
             text-transform: uppercase;
         }
 
@@ -187,6 +250,10 @@
             color: #1e40af;
         }
 
+        .action {
+            color: #4b5563;
+        }
+
         .empty {
             text-align: center;
             padding: 40px;
@@ -194,7 +261,7 @@
         }
 
         .error {
-            padding: 20px;
+            padding: 16px;
             color: #b91c1c;
             background: #fee2e2;
             margin: 20px;
@@ -202,7 +269,12 @@
         }
 
         @media (max-width: 800px) {
+
             .cards {
+                grid-template-columns: 1fr;
+            }
+
+            .config-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -217,6 +289,10 @@
             .welcome h2 {
                 font-size: 22px;
             }
+
+            .status {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -224,76 +300,174 @@
 <body>
 
 <header class="topbar">
+
     <h1>Discord Admin Dashboard</h1>
 
     <div class="topbar-right">
-        <span class="status" id="lastUpdated">Loading...</span>
-        <a class="logout" href="/logout">Logout</a>
+
+        <span class="status" id="lastUpdated">
+            Loading...
+        </span>
+
+        <a class="logout" href="/logout">
+            Logout
+        </a>
+
     </div>
+
 </header>
+
 
 <main class="container">
 
+    <!-- PAGE INTRO -->
     <div class="welcome">
+
         <h2>Command Activity</h2>
-        <p>Monitor Discord commands received by your application.</p>
+
+        <p>
+            Monitor Discord commands, actions, and command configuration.
+        </p>
+
     </div>
 
+
+    <!-- SUMMARY CARDS -->
     <section class="cards">
 
         <div class="card">
-            <div class="card-title">Total Commands</div>
-            <div class="card-value" id="totalCommands">0</div>
+
+            <div class="card-title">
+                Total Commands
+            </div>
+
+            <div class="card-value" id="totalCommands">
+                0
+            </div>
+
         </div>
 
-        <div class="card">
-            <div class="card-title">Reports</div>
-            <div class="card-value" id="reportCount">0</div>
-        </div>
 
         <div class="card">
-            <div class="card-title">Status Checks</div>
-            <div class="card-value" id="statusCount">0</div>
+
+            <div class="card-title">
+                Reports
+            </div>
+
+            <div class="card-value" id="reportCount">
+                0
+            </div>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="card-title">
+                Status Checks
+            </div>
+
+            <div class="card-value" id="statusCount">
+                0
+            </div>
+
         </div>
 
     </section>
 
-    <section class="logs-section">
+
+    <!-- COMMAND CONFIGURATION -->
+    <section class="section">
 
         <div class="section-header">
-            <h3>Command Logs</h3>
 
-            <button class="refresh-button" onclick="loadLogs()">
+            <h3>
+                Command Configuration
+            </h3>
+
+            <button
+                    class="refresh-button"
+                    onclick="loadConfigs()">
                 Refresh
             </button>
+
+        </div>
+
+        <div
+                id="configContainer"
+                class="section-content">
+
+            Loading configuration...
+
+        </div>
+
+    </section>
+
+
+    <!-- COMMAND LOGS -->
+    <section class="section">
+
+        <div class="section-header">
+
+            <h3>
+                Command Logs
+            </h3>
+
+            <button
+                    class="refresh-button"
+                    onclick="loadLogs()">
+                Refresh
+            </button>
+
         </div>
 
         <div id="message"></div>
 
         <div class="table-container">
+
             <table>
+
                 <thead>
+
                 <tr>
+
                     <th>ID</th>
+
                     <th>Command</th>
+
                     <th>User</th>
+
                     <th>Channel</th>
+
                     <th>Text</th>
+
+                    <th>Action Taken</th>
+
                     <th>Time</th>
+
                 </tr>
+
                 </thead>
 
                 <tbody id="logs">
+
                 </tbody>
+
             </table>
+
         </div>
 
     </section>
 
 </main>
 
+
 <script>
 
+    /*
+     * Prevent HTML/JavaScript injection
+     * when displaying values received from the backend.
+     */
     function escapeHtml(value) {
 
         if (value === null || value === undefined) {
@@ -308,6 +482,10 @@
             .replaceAll("'", "&#039;");
     }
 
+
+    /*
+     * Format timestamp
+     */
     function formatDate(value) {
 
         if (!value) {
@@ -323,6 +501,10 @@
         return date.toLocaleString();
     }
 
+
+    /*
+     * Load command logs
+     */
     async function loadLogs() {
 
         const table = document.getElementById("logs");
@@ -332,7 +514,8 @@
 
         try {
 
-            const response = await fetch("/api/admin/logs");
+            const response =
+                await fetch("/api/admin/logs");
 
             if (!response.ok) {
                 throw new Error("Failed to load logs");
@@ -340,66 +523,125 @@
 
             const logs = await response.json();
 
-            document.getElementById("totalCommands").textContent = logs.length;
+
+            /*
+             * Update summary cards
+             */
+
+            document.getElementById("totalCommands")
+                .textContent = logs.length;
+
 
             const reports = logs.filter(
                 log => log.commandName === "report"
             ).length;
 
+
             const statuses = logs.filter(
                 log => log.commandName === "status"
             ).length;
 
-            document.getElementById("reportCount").textContent = reports;
-            document.getElementById("statusCount").textContent = statuses;
+
+            document.getElementById("reportCount")
+                .textContent = reports;
+
+            document.getElementById("statusCount")
+                .textContent = statuses;
+
+
+            /*
+             * Empty state
+             */
 
             if (logs.length === 0) {
 
                 table.innerHTML = `
                     <tr>
-                        <td colspan="6" class="empty">
+                        <td colspan="7" class="empty">
                             No commands received yet.
                         </td>
                     </tr>
                 `;
 
-            } else {
-
-                table.innerHTML = "";
-
-                logs.forEach(log => {
-
-                    const row = document.createElement("tr");
-
-                    const badgeClass =
-                        log.commandName === "report"
-                            ? "badge-report"
-                            : "badge-status";
-
-                    row.innerHTML = `
-                        <td>${escapeHtml(log.id)}</td>
-
-                        <td class="command">
-                            <span class="badge ${badgeClass}">
-                                /${escapeHtml(log.commandName)}
-                            </span>
-                        </td>
-
-                        <td>${escapeHtml(log.userId)}</td>
-
-                        <td>${escapeHtml(log.channelId)}</td>
-
-                        <td>${escapeHtml(log.text || "-")}</td>
-
-                        <td>${escapeHtml(formatDate(log.createdAt))}</td>
-                    `;
-
-                    table.appendChild(row);
-                });
+                return;
             }
 
-            document.getElementById("lastUpdated").textContent =
-                "Updated " + new Date().toLocaleTimeString();
+
+            /*
+             * Clear existing table
+             */
+
+            table.innerHTML = "";
+
+
+            /*
+             * Add each log
+             */
+
+            logs.forEach(log => {
+
+                const row = document.createElement("tr");
+
+
+                const badgeClass =
+                    log.commandName === "report"
+                        ? "badge-report"
+                        : "badge-status";
+
+
+                row.innerHTML = `
+
+                    <td>
+                        ${escapeHtml(log.id)}
+                    </td>
+
+                    <td class="command">
+
+                        <span class="badge ${badgeClass}">
+                            /${escapeHtml(log.commandName)}
+                        </span>
+
+                    </td>
+
+                    <td>
+                        ${escapeHtml(log.userId)}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(log.channelId)}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(log.text || "-")}
+                    </td>
+
+                    <td class="action">
+                        ${escapeHtml(log.actionTaken || "-")}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            formatDate(log.createdAt)
+                        )}
+                    </td>
+
+                `;
+
+
+                table.appendChild(row);
+
+            });
+
+
+            /*
+             * Show refresh time
+             */
+
+            document.getElementById("lastUpdated")
+                .textContent =
+                "Updated " +
+                new Date().toLocaleTimeString();
+
 
         } catch (error) {
 
@@ -408,12 +650,295 @@
                     Unable to load command logs.
                 </div>
             `;
+
         }
+
     }
+
+
+    /*
+     * Load command configurations
+     */
+    async function loadConfigs() {
+
+        const container =
+            document.getElementById("configContainer");
+
+
+        try {
+
+            const response =
+                await fetch("/api/admin/configs");
+
+
+            if (!response.ok) {
+                throw new Error(
+                    "Failed to load configuration"
+                );
+            }
+
+
+            const configs =
+                await response.json();
+
+
+            container.innerHTML = "";
+
+
+            /*
+             * No configurations
+             */
+
+            if (configs.length === 0) {
+
+                container.innerHTML = `
+                    <div class="empty">
+                        No command configuration found.
+                    </div>
+                `;
+
+                return;
+            }
+
+
+            /*
+             * Configuration cards
+             */
+
+            const grid =
+                document.createElement("div");
+
+            grid.className = "config-grid";
+
+
+            configs.forEach(config => {
+
+                const card =
+                    document.createElement("div");
+
+                card.className =
+                    "config-card";
+
+
+                card.innerHTML = `
+
+                    <h4>
+                        /${escapeHtml(config.commandName)}
+                    </h4>
+
+
+                    <div class="config-row">
+
+                        <label class="checkbox-row">
+
+                            <input
+                                type="checkbox"
+                                id="enabled-${escapeHtml(
+                                    config.commandName
+                                )}"
+                                ${config.enabled ? "checked" : ""}
+                            >
+
+                            Enabled
+
+                        </label>
+
+                    </div>
+
+
+                    <div class="config-row">
+
+                        <label
+                            class="config-label"
+                            for="response-${escapeHtml(
+                                config.commandName
+                            )}">
+                            Response Message
+                        </label>
+
+                        <input
+                            class="response-input"
+                            type="text"
+                            id="response-${escapeHtml(
+                                config.commandName
+                            )}"
+                            value="${escapeHtml(
+                                config.responseMessage
+                            )}"
+                        >
+
+                    </div>
+
+
+                    <div class="config-row">
+
+                        <label class="checkbox-row">
+
+                            <input
+                                type="checkbox"
+                                id="mirror-${escapeHtml(
+                                    config.commandName
+                                )}"
+                                ${config.mirrorEnabled ? "checked" : ""}
+                            >
+
+                            Mirror to Slack
+
+                        </label>
+
+                    </div>
+
+
+                    <button
+                        class="save-button"
+                        onclick="saveConfig(
+                            '${escapeHtml(
+                                config.commandName
+                            )}'
+                        )">
+
+                        Save
+
+                    </button>
+
+
+                    <span
+                        class="save-status"
+                        id="saved-${escapeHtml(
+                            config.commandName
+                        )}">
+
+                    </span>
+
+                `;
+
+
+                grid.appendChild(card);
+
+            });
+
+
+            container.appendChild(grid);
+
+
+        } catch (error) {
+
+            container.innerHTML = `
+                <div class="error">
+                    Unable to load command configuration.
+                </div>
+            `;
+
+        }
+
+    }
+
+
+    /*
+     * Save command configuration
+     */
+    async function saveConfig(commandName) {
+
+        const enabled =
+            document.getElementById(
+                `enabled-${commandName}`
+            ).checked;
+
+
+        const responseMessage =
+            document.getElementById(
+                `response-${commandName}`
+            ).value;
+
+
+        const mirrorEnabled =
+            document.getElementById(
+                `mirror-${commandName}`
+            ).checked;
+
+
+        const result =
+            document.getElementById(
+                `saved-${commandName}`
+            );
+
+
+        result.textContent = "Saving...";
+
+
+        try {
+
+            const response =
+                await fetch(
+                    `/api/admin/configs/${commandName}`,
+                    {
+                        method: "PUT",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+
+                            enabled: enabled,
+
+                            responseMessage:
+                                responseMessage,
+
+                            mirrorEnabled:
+                                mirrorEnabled
+
+                        })
+                    }
+                );
+
+
+            if (!response.ok) {
+                throw new Error(
+                    "Configuration update failed"
+                );
+            }
+
+
+            result.textContent = "Saved ✅";
+
+
+            /*
+             * Remove the success message
+             * after a few seconds.
+             */
+
+            setTimeout(() => {
+
+                result.textContent = "";
+
+            }, 3000);
+
+
+        } catch (error) {
+
+            result.textContent = "Failed ❌";
+
+        }
+
+    }
+
+
+    /*
+     * Initial page load
+     */
 
     loadLogs();
 
-    // Automatically refresh every 10 seconds
+    loadConfigs();
+
+
+    /*
+     * Live log refresh
+     * every 10 seconds.
+     */
+
     setInterval(loadLogs, 10000);
 
 </script>

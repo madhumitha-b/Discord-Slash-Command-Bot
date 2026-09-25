@@ -23,6 +23,9 @@ public class CommandLog {
     @Column(length = 2000)
     private String text;
 
+    @Column(length = 500)
+private String actionTaken;
+
     private Instant createdAt;
 
     public Long getId() {
@@ -75,5 +78,13 @@ public class CommandLog {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getActionTaken() {
+    return actionTaken;
+}
+
+    public void setActionTaken(String actionTaken) {
+        this.actionTaken = actionTaken;
     }
 }

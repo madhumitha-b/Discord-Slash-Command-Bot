@@ -14,17 +14,20 @@ public class DiscordInteractionController {
     private final ObjectMapper objectMapper;
     private final CommandLogRepository commandLogRepository;
     private final DiscordMirrorService discordMirrorService;
+    private final CommandConfigRepository commandConfigRepository;
 
     public DiscordInteractionController(
             DiscordSignatureVerifier signatureVerifier,
             ObjectMapper objectMapper,
             CommandLogRepository commandLogRepository,
-            DiscordMirrorService discordMirrorService) {
+            DiscordMirrorService discordMirrorService,
+            CommandConfigRepository commandConfigRepository) {
 
         this.signatureVerifier = signatureVerifier;
         this.objectMapper = objectMapper;
         this.commandLogRepository = commandLogRepository;
         this.discordMirrorService = discordMirrorService;
+        this.commandConfigRepository = commandConfigRepository;
     }
 
     @PostMapping(
@@ -69,6 +72,24 @@ public class DiscordInteractionController {
                         .get("name")
                         .asText();
 
+                // 5. Get command configuration from PostgreSQL
+                CommandConfig config = commandConfigRepository
+                        .findByCommandName(commandName)
+                        .orElse(null);
+
+                if (config == null) {
+                    return ResponseEntity.ok(
+                            "{\"type\":4,\"data\":{\"content\":\"Command is not configured\"}}"
+                    );
+                }
+
+                // 6. Check whether command is enabled
+                if (!config.isEnabled()) {
+                    return ResponseEntity.ok(
+                            "{\"type\":4,\"data\":{\"content\":\"This command is currently disabled\"}}"
+                    );
+                }
+
                 String interactionId = interaction
                         .get("id")
                         .asText();
@@ -83,13 +104,14 @@ public class DiscordInteractionController {
                         .get("channel_id")
                         .asText();
 
-                // Prevent duplicate processing
+                // 7. Prevent duplicate processing
                 if (commandLogRepository.existsByInteractionId(interactionId)) {
                     return ResponseEntity.ok(
                             "{\"type\":4,\"data\":{\"content\":\"Already processed\"}}"
                     );
                 }
 
+                // 8. Create command log
                 CommandLog log = new CommandLog();
 
                 log.setInteractionId(interactionId);
@@ -100,7 +122,7 @@ public class DiscordInteractionController {
 
                 String reportText = null;
 
-                // Extract report text only once
+                // 9. Extract report text
                 if (commandName.equals("report")) {
 
                     reportText = interaction
@@ -113,8 +135,73 @@ public class DiscordInteractionController {
                     log.setText(reportText);
                 }
 
-                // Save command
-                CommandLog savedLog = commandLogRepository.save(log);
+                // 10. STATUS
+                if (commandName.equals("status")) {
+
+                    log.setActionTaken(
+                            "Command saved to DB; Discord response sent"
+                    );
+
+                    CommandLog savedLog =
+                            commandLogRepository.save(log);
+
+                    System.out.println(
+                            "LOG SAVED: id=" + savedLog.getId()
+                                    + ", command=" + savedLog.getCommandName()
+                                    + ", user=" + savedLog.getUserId()
+                    );
+
+                    return ResponseEntity.ok(
+                            "{\"type\":4,\"data\":{\"content\":\""
+                                    + config.getResponseMessage()
+                                    + "\"}}"
+                    );
+                }
+
+                // 11. REPORT
+                if (commandName.equals("report")) {
+
+                    log.setActionTaken(
+                            config.isMirrorEnabled()
+                                    ? "Command saved to DB; Discord response sent; Slack mirror triggered"
+                                    : "Command saved to DB; Discord response sent; Slack mirror disabled"
+                    );
+
+                    CommandLog savedLog =
+                            commandLogRepository.save(log);
+
+                    System.out.println(
+                            "LOG SAVED: id=" + savedLog.getId()
+                                    + ", command=" + savedLog.getCommandName()
+                                    + ", user=" + savedLog.getUserId()
+                    );
+
+                    // Start Slack mirror only when enabled
+                    if (config.isMirrorEnabled()) {
+
+                        discordMirrorService.sendToMirrorChannel(
+                                config.getResponseMessage()
+                                        + ": "
+                                        + reportText
+                        );
+                    }
+
+                    return ResponseEntity.ok(
+                            "{\"type\":4,\"data\":{\"content\":\""
+                                    + config.getResponseMessage()
+                                    + ": "
+                                    + reportText
+                                    + "\"}}"
+                    );
+                }
+
+                // 12. Unknown command
+                log.setActionTaken(
+                        "Command saved to DB; unknown command response sent"
+                );
+
+                CommandLog savedLog =
+                        commandLogRepository.save(log);
 
                 System.out.println(
                         "LOG SAVED: id=" + savedLog.getId()
@@ -122,30 +209,6 @@ public class DiscordInteractionController {
                                 + ", user=" + savedLog.getUserId()
                 );
 
-                // STATUS
-                if (commandName.equals("status")) {
-
-                    return ResponseEntity.ok(
-                            "{\"type\":4,\"data\":{\"content\":\"Bot is running! ✅\"}}"
-                    );
-                }
-
-                // REPORT
-                if (commandName.equals("report")) {
-
-                    // Send report to Server 2
-                    discordMirrorService.sendToMirrorChannel(
-                            "Report received: " + reportText
-                    );
-
-                    return ResponseEntity.ok(
-                            "{\"type\":4,\"data\":{\"content\":\"Report received: "
-                                    + reportText
-                                    + "\"}}"
-                    );
-                }
-
-                // Unknown command
                 return ResponseEntity.ok(
                         "{\"type\":4,\"data\":{\"content\":\"Unknown command\"}}"
                 );
@@ -155,6 +218,8 @@ public class DiscordInteractionController {
                     .body("{\"error\":\"Unsupported interaction type\"}");
 
         } catch (Exception e) {
+
+            e.printStackTrace();
 
             return ResponseEntity.badRequest()
                     .body("{\"error\":\"Invalid JSON\"}");
