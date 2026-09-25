@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Discord Admin Dashboard</title>
+</head>
+
+<body>
+
+<h1>Discord Admin Dashboard</h1>
+
+<button onclick="loadLogs()">Refresh</button>
+<a href="/logout">Logout</a>
+
+<h2>Command Logs</h2>
+
+<table border="1">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Command</th>
+        <th>User</th>
+        <th>Channel</th>
+        <th>Text</th>
+        <th>Time</th>
+    </tr>
+    </thead>
+
+    <tbody id="logs"></tbody>
+</table>
+
+<script>
+
+async function loadLogs() {
+
+    const response = await fetch('/api/admin/logs');
+    const logs = await response.json();
+
+    const table = document.getElementById('logs');
+
+    table.innerHTML = '';
+
+    logs.forEach(log => {
+
+        const row = `
+            <tr>
+                <td>${log.id}</td>
+                <td>${log.commandName}</td>
+                <td>${log.userId}</td>
+                <td>${log.channelId}</td>
+                <td>${log.text || ''}</td>
+                <td>${log.createdAt}</td>
+            </tr>
+        `;
+
+        table.innerHTML += row;
+    });
+}
+
+loadLogs();
+
+</script>
+
+</body>
+</html>
