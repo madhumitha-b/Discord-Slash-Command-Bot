@@ -887,8 +887,6 @@ Change the command response message from the dashboard and save it.
 
 Run the command again in Discord.
 
-Verify that the new configuration is used.
-
 ## 7. Test disabling mirroring
 
 Turn:
@@ -899,12 +897,6 @@ Mirror to Slack → OFF
 
 Run `/report`.
 
-Verify:
-
-* Discord still responds
-* Command is recorded
-* Slack does not receive the message
-
 ## 8. Test disabling a command
 
 Turn:
@@ -912,27 +904,6 @@ Turn:
 ```text
 Enabled → OFF
 ```
-
-Save and execute the command.
-
-Verify that the command reports that it is disabled.
-
----
-
-# Submission Files
-
-The repository includes:
-
-```text
-README.md
-.env.example
-AI_NOTES.md
-```
-
-`.env.example` contains variable names/placeholders only and does not contain real credentials.
-
-`AI_NOTES.md` documents the AI tools used during development, implementation decisions, debugging experience, and possible future improvements.
-
 ---
 
 # Known Design Choices
@@ -959,9 +930,3 @@ Possible future improvements include:
 * Automated integration tests
 * Database migrations using Flyway or Liquibase
 * More advanced dashboard filtering and analytics
-
----
-
-# License
-
-This project was created as part of a software engineering assessment.
