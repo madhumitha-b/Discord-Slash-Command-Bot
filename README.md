@@ -133,21 +133,6 @@ When a user runs a slash command, Discord sends a signed HTTP POST request to:
 ```text
 POST /api/discord/interactions
 ```
-
-The application performs the following steps:
-
-1. Verifies the Discord Ed25519 signature.
-2. Validates the request timestamp.
-3. Handles Discord PING requests.
-4. Identifies the slash command.
-5. Loads the command configuration from PostgreSQL.
-6. Rejects commands that are not configured or are disabled.
-7. Checks the Discord interaction ID to prevent duplicate processing.
-8. Extracts command information and report text when applicable.
-9. Stores the command and action information in PostgreSQL.
-10. Responds to the user in Discord.
-11. Starts the Slack mirror asynchronously when enabled.
-
 ---
 
 # Slash Commands
